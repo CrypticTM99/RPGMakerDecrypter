@@ -1,63 +1,63 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
 
 namespace RPGMakerDecrypter.RGSSAD
 {
-    public static class ArchivedFileNameUtils
+    public static class ArchiveFileNameUtils
     {
+        /// <summary>
+        /// Gets the file name from a path string.
+        /// </summary>
         public static string GetFileName(string name)
         {
             return GetPathParts(name).Last();
         }
 
+        /// <summary>
+        /// Returns a platform-specific sanitized file path.
+        /// </summary>
         public static string GetPlatformSpecificPath(string name)
         {
             var pathParts = GetPathParts(name);
-
-            pathParts = CleanUnicodeCharacters(pathParts);
-            pathParts = CleanInvalidPathCharacters(pathParts);
+            pathParts = SanitizeUnicodeSequences(pathParts);
+            pathParts = RemoveInvalidPathCharacters(pathParts);
 
             return Path.Combine(pathParts);
         }
 
+        /// <summary>
+        /// Splits the file name into path parts using Windows-style delimiters.
+        /// </summary>
         private static string[] GetPathParts(string name)
         {
-            // Paths in RGSSAD file names are always with Windows-style delimeters
             return name.Split('\\');
         }
 
-        private static string[] CleanUnicodeCharacters(string[] pathParts)
+        /// <summary>
+        /// Removes encoded Unicode sequences like \uXXXX or \UXXXX from path parts.
+        /// </summary>
+        private static string[] SanitizeUnicodeSequences(string[] pathParts)
         {
-            var cleanedPathParts = new List<string>();
-            var unicodeConstantRegex = new Regex(@"(?i)\\(u|U)([0-9]|[A-F])([0-9]|[A-F])([0-9]|[A-F])([0-9]|[A-F])");
-
-            foreach (var pathPart in pathParts)
-            {
-                cleanedPathParts.Add(unicodeConstantRegex.Replace(pathPart, string.Empty));
-            }
-
-            return cleanedPathParts.ToArray();
+            var regex = new Regex(@"(?i)\\[uU][0-9A-F]{4}");
+            return pathParts.Select(part => regex.Replace(part, string.Empty)).ToArray();
         }
 
-        private static string[] CleanInvalidPathCharacters(string[] pathParts)
+        /// <summary>
+        /// Removes characters invalid in file names from each path part.
+        /// </summary>
+        private static string[] RemoveInvalidPathCharacters(string[] pathParts)
         {
-            var cleanedPathParts = new List<string>();
-
-            foreach (var pathPart in pathParts)
+            var invalidChars = Path.GetInvalidFileNameChars();
+            return pathParts.Select(part =>
             {
-                var cleanedPathPart = pathPart;
-
-                foreach(var invalidFileNameChar in Path.GetInvalidFileNameChars())
+                foreach (var ch in invalidChars)
                 {
-                    cleanedPathPart = cleanedPathPart.Replace($"{invalidFileNameChar}", string.Empty);
+                    part = part.Replace(ch.ToString(), string.Empty);
                 }
-
-                cleanedPathParts.Add(cleanedPathPart);
-            }
-
-            return cleanedPathParts.ToArray();
+                return part;
+            }).ToArray();
         }
     }
 }
